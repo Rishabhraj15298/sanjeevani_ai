@@ -105,3 +105,15 @@ export const loginUser = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+
+
+
+export const getUserProfile = async (req, res) => {
+  try {
+    return res.status(200).json({ success: true, user: req.user });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+

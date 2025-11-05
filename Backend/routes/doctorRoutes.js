@@ -7,3 +7,4 @@ router.get("/dashboard", protect, authorizeRoles("doctor"), (req, res) => {
 });
 
 export default router;
+      

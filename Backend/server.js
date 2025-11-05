@@ -4,6 +4,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser"; // 👈 for handling JWT in cookies
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
+import getProfile from "./routes/getProfile.js";
 
 dotenv.config();
 
@@ -22,6 +23,7 @@ app.use(cookieParser());
 
 // ✅ Routes
 app.use("/api/auth", authRoutes);
+app.use("/api", getProfile);
 
 // ✅ Health check route
 app.get("/", (req, res) => {

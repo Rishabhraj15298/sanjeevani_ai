@@ -11,19 +11,6 @@ export default function App() {
   return (
     <>
       {/* Header */}
-      <header className="fixed top-0 right-0 p-4 flex items-center gap-4 z-60">
-        <Link to="/login">
-          <button className="bg-white text-black px-4 py-2 rounded-md hover:bg-gray-200 transition">
-            Login
-          </button>
-        </Link>
-
-        <Link to="/register">
-          <button className="bg-transparent border border-white text-white px-4 py-2 rounded-md hover:bg-white hover:text-black transition">
-            Register
-          </button>
-        </Link>
-      </header>
 
       <Routes>
         {/* 🏠 Home Page */}
