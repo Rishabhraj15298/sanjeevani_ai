@@ -51,11 +51,12 @@ import DoctorAnalytics from './pages/doctor/Analytics';
 import DoctorPatients from './pages/doctor/Patients';
 import DoctorFiles from './pages/doctor/Files';
 import PrivateRoute from './components/PrivateRoute';
-
+import CommonDashboard from './pages/CommonDashboard';
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Login />} />
+      <Route path="/" element={<CommonDashboard />} />
+      <Route path="/login" element={<Login />} />
       <Route path="/patient" element={<PrivateRoute role="patient"><PatientChat/></PrivateRoute>} />
       <Route path="/patient/analytics" element={<PrivateRoute role="patient"><PatientAnalytics/></PrivateRoute>} />
       <Route path="/patient/history" element={<PrivateRoute role="patient"><PatientHistory/></PrivateRoute>} />
