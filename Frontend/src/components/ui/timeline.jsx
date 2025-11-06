@@ -20,7 +20,7 @@ export const Timeline = ({ data = [] }) => {
   });
 
   // height (px) of the colored vertical line based on progress
-  const heightTransform = useTransform(scrollYProgress, (v) => `${v * height}px`);
+  const heightTransform = useTransform(scrollYProgress, (v) => `${v*height}px`);
   const opacityTransform = useTransform(scrollYProgress, [0, 0.05], [0, 1]);
 
   // Measure the total height and each item's offset from container top

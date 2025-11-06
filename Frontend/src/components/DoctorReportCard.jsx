@@ -4,6 +4,8 @@ import AIPlan from './AIPlan';
 import FilePreviewModal from './FilePreviewModal';
 import ReasonModal from './ReasonModal';
 import api from '../services/api';
+import ApproveModal from './ApproveModal';
+
 
 function Pill({ children }) { return <span className="pill">{children}</span>; }
 
@@ -13,6 +15,8 @@ export default function DoctorReportCard({ report, onApprove, onDecline }) {
   const [filesOpen, setFilesOpen] = useState(false);
   const [reasonOpen, setReasonOpen] = useState(false);
   const [fetchingFiles, setFetchingFiles] = useState(false);
+  const [approveOpen, setApproveOpen] = useState(false);
+
 
   async function fetchFiles() {
     if (!patient || !patient._id) return;
@@ -27,6 +31,7 @@ export default function DoctorReportCard({ report, onApprove, onDecline }) {
     } finally { setFetchingFiles(false); }
   }
 
+  
   return (
     <div className="card">
       <div className="flex items-start gap-4">
@@ -64,11 +69,28 @@ export default function DoctorReportCard({ report, onApprove, onDecline }) {
             </div>
           </div>
 
-          <div className="mt-3 flex gap-2">
+          {/* <div className="mt-3 flex gap-2">
             <button onClick={onApprove} className="btn btn-ok">Approve</button>
             <button onClick={() => setReasonOpen(true)} className="btn btn-danger">Decline</button>
             <a className="btn btn-ghost small" href={`/uploads`} target="_blank" rel="noreferrer">Uploads Folder</a>
-          </div>
+          </div> */}
+          <div className="mt-3 flex gap-2">
+  <button onClick={() => setApproveOpen(true)} className="btn btn-ok">Approve</button>
+  <button onClick={() => setReasonOpen(true)} className="btn btn-danger">Decline</button>
+  <a className="btn btn-ghost small" href={`/uploads`} target="_blank" rel="noreferrer">Uploads Folder</a>
+</div>
+
+<ApproveModal
+  open={approveOpen}
+  aiContent={content}
+  onClose={() => setApproveOpen(false)}
+  onSubmit={async ({ finalSummary, meds, doctorNotes }) => {
+    setApproveOpen(false);
+    // use parent handler; we already passed onApprove from Queue
+    await onApprove(id, content, { finalSummary, meds, doctorNotes });
+  }}
+/>
+
         </div>
       </div>
 

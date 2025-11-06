@@ -31,7 +31,8 @@ const AIReportSchema = new mongoose.Schema({
   generatedBy: { type: String, default: 'gemini' },
   inputContext: { type: Object },
   content: { type: Object, default: {} }, // structured JSON from Gemini (or fallback)
-  status: { type: String, enum: ['pending','approved','declined'], default: 'pending' }
+  status: { type: String, enum: ['pending','approved','declined'], default: 'pending' },
+  conversationId: { type: String, default: null }
 }, { timestamps: true });
 
 AIReportSchema.index({ patient: 1, status: 1, createdAt: -1 });

@@ -39,6 +39,7 @@
 // module.exports = multer({ storage, fileFilter, limits });
 
 
+// src/middleware/upload.js
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
@@ -46,21 +47,27 @@ const multer = require('multer');
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-const ALLOWED = new Set(['image/png','image/jpeg','image/jpg','application/pdf']);
+const ALLOWED = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'application/pdf',
+]);
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
   filename: (_req, file, cb) => {
     const safe = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
     cb(null, `${Date.now()}-${Math.round(Math.random()*1e6)}-${safe}`);
-  }
+  },
 });
 
 function fileFilter(_req, file, cb) {
-  if (!ALLOWED.has(file.mimetype)) return cb(new Error('Only PNG, JPG, JPEG, or PDF allowed'));
+  if (!ALLOWED.has(file.mimetype)) return cb(new Error('Only PNG/JPG/PDF allowed'));
   cb(null, true);
 }
 
 const limits = { fileSize: 10 * 1024 * 1024 };
 
+// ❗ Export the **multer instance** directly (function),
 module.exports = multer({ storage, fileFilter, limits });

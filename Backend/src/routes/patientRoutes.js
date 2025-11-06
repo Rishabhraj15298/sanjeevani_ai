@@ -56,9 +56,12 @@ const router = require('express').Router();
 const auth = require('../middleware/auth');
 const roles = require('../middleware/roles');
 
+const chatCtrl = require('../controllers/chatController');
 // all patient routes require patient role
 router.use(auth, roles('patient'));
 
+const historyCtrl = require('../controllers/historyController');
+router.get('/history/reports', historyCtrl.getApprovedReportsHistory);
 // create a reading
 router.post('/reading', ctrl.addReading);
 
@@ -79,6 +82,8 @@ router.post('/upload', upload.array('files', 6), ctrl.uploadFiles);
 
 // list my files
 router.get('/files', ctrl.listFiles);
+router.get('/chat', chatCtrl.getChat);
+router.post('/chat', chatCtrl.postChat);
 
 module.exports = router;
 

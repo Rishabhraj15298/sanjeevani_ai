@@ -64,20 +64,21 @@ export default function DoctorQueue() {
   }, []);
 
   // Approve handler (removes item optimistically)
-  async function handleApprove(aiReportId, content) {
-    try {
-      await api.post(`/api/doctor/approve/${aiReportId}`, {
-        finalSummary: content?.prediction || 'Approved',
-        meds: content?.suggested_medicines || [],
-        doctorNotes: 'Approved by doctor UI'
-      });
-      setItems(prev => prev.filter(i => i.id !== aiReportId));
-      toast.success('Approved and patient notified');
-    } catch (e) {
-      console.error('Approve failed', e);
-      toast.error('Approve failed');
-    }
+ async function handleApprove(aiReportId, content, payloadFromModal) {
+  try {
+    const body = payloadFromModal || {
+      finalSummary: content?.prediction || 'Approved',
+      meds: content?.suggested_medicines || [],
+      doctorNotes: 'Approved by doctor UI'
+    };
+    await api.post(`/api/doctor/approve/${aiReportId}`, body);
+    setItems(prev => prev.filter(i => i.id !== aiReportId));
+    toast.success('Approved and patient notified');
+  } catch (e) {
+    console.error('Approve failed', e);
+    toast.error('Approve failed');
   }
+}
 
   // Decline handler (calls API then removes item)
   async function handleDecline(aiReportId, reason) {

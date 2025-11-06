@@ -45,6 +45,9 @@ app.use(morgan('dev'));
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // api
+
+const providerRoutes = require('./routes/providerRoutes');
+app.use('/api/providers', providerRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/patient', patientRoutes);
 app.use('/api/doctor', doctorRoutes);

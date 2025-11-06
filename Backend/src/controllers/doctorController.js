@@ -155,6 +155,7 @@ const AIReport = require('../models/AIReport');
 const ApprovedReport = require('../models/ApprovedReport');
 const User = require('../models/User');
 const { getIO } = require('../socket');
+const ChatMessage = require('../models/ChatMessage');
 
 exports.getPendingReports = async (req, res, next) => {
   try {
@@ -230,6 +231,110 @@ exports.getPatientFiles = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
+
+// exports.getAllFiles = async (req, res, next) => {
+//   try {
+//     // limit and sort parameters (optional query)
+//     const limit = Math.min(200, parseInt(req.query.limit || '100', 10));
+//     const files = await Attachment.find({})
+//       .sort({ createdAt: -1 })
+//       .limit(limit)
+//       .populate('patient', 'name age email') // show patient basic info
+//       .lean();
+//     res.json({ files });
+//   } catch (e) {
+//     next(e);
+//   }
+// };
+
+
+
+//NEW NEW 
+// inside src/controllers/doctorController.js (replace approveReport & declineReport)
+
+
+exports.approveReport = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { finalSummary, meds = [], doctorNotes = '' } = req.body;
+    const ai = await AIReport.findById(id);
+    if (!ai) return res.status(404).json({ message: 'Not found' });
+
+    ai.status = 'approved';
+    await ai.save();
+
+    const approved = await ApprovedReport.create({
+      aiReport: ai._id,
+      patient: ai.patient,
+      doctor: req.user.id,
+      finalSummary,
+      meds,
+      doctorNotes,
+      approvedAt: new Date()
+    });
+
+    // create chat message for patient, include conversationId from ai report
+    const reportContent = {
+      type: 'approved_report',
+      finalSummary,
+      meds,
+      doctorNotes,
+      aiContent: ai.content || {}
+    };
+    const chatMsg = await ChatMessage.create({
+      patient: ai.patient,
+      sender: 'doctor',
+      type: 'report',
+      content: reportContent,
+      conversationId: ai.conversationId || null
+    });
+
+    // Emit the chat message to patient
+    try {
+      const io = getIO();
+      io.to(`user:${ai.patient.toString()}`).emit('chat:message', { message: chatMsg });
+      io.to(`user:${ai.patient.toString()}`).emit('report:approved', {
+        approvedId: approved._id,
+        finalSummary, meds, doctorNotes, conversationId: ai.conversationId || null
+      });
+    } catch (emitErr) { console.error('emit to patient failed', emitErr); }
+
+    res.json({ ok: true, approved });
+  } catch (e) { next(e); }
+};
+
+exports.declineReport = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason = 'Not suitable' } = req.body;
+    const ai = await AIReport.findById(id);
+    if (!ai) return res.status(404).json({ message: 'Not found' });
+
+    ai.status = 'declined';
+    await ai.save();
+
+    // save as chat message so patient sees it
+    const chatMsg = await ChatMessage.create({
+      patient: ai.patient,
+      sender: 'doctor',
+      type: 'text',
+      content: { text: `Doctor declined: ${reason}` }
+    });
+
+    try {
+      const io = getIO();
+      io.to(`user:${ai.patient.toString()}`).emit('report:declined', {
+        aiReportId: ai._id,
+        reason
+      });
+      io.to(`user:${ai.patient.toString()}`).emit('chat:message', { message: chatMsg });
+    } catch (emitErr) {
+      console.error('emit decline to patient failed', emitErr);
+    }
+
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+};
 
 exports.getAllFiles = async (req, res, next) => {
   try {

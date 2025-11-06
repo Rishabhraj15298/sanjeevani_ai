@@ -301,13 +301,17 @@ const { getIO } = require('../socket');
 const { generateAIReportFromReadings } = require('../services/gemini');
 
 // POST /api/patient/reading
+// src/controllers/patientController.js
 exports.addReading = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
+    // pull fields (conversationId optional)
     const { systolic, diastolic, pulse, symptoms, measuredAt, notes } = req.body;
+    const conversationId = req.body.conversationId || null;
 
+    // 1) Save reading
     const reading = await BPReading.create({
       patient: req.user.id,
       systolic,
@@ -317,57 +321,92 @@ exports.addReading = async (req, res, next) => {
       measuredAt: measuredAt ? new Date(measuredAt) : Date.now()
     });
 
-    // nudge (5 readings/week)
-    try {
-      const sinceWeek = new Date(); sinceWeek.setDate(sinceWeek.getDate()-7);
-      const count = await BPReading.countDocuments({ patient: req.user.id, measuredAt: { $gte: sinceWeek } });
-      const io = getIO();
-      if (count < 5) {
-        io.to(`user:${req.user.id}`).emit('nudge:keep-going', {
-          target: 5, current: count,
-          message: `Great! ${count}/5 readings this week. Add ${5-count} more for a better assessment.`
-        });
-      }
-    } catch (e) { console.error('nudge emit failed', e?.message || e); }
-
-    // notify doctors about raw reading
+    // 2) Emit reading to doctors immediately (so they can see incoming readings)
     try {
       const io = getIO();
       io.to('doctors').emit('reading:created', {
         readingId: reading._id,
         patientId: req.user.id,
-        systolic: reading.systolic, diastolic: reading.diastolic,
-        pulse: reading.pulse, symptoms: reading.symptoms, measuredAt: reading.measuredAt
+        systolic: reading.systolic,
+        diastolic: reading.diastolic,
+        pulse: reading.pulse,
+        symptoms: reading.symptoms,
+        measuredAt: reading.measuredAt
       });
-    } catch (_) {}
+    } catch (emitErr) {
+      console.error('emit reading:created failed', emitErr);
+    }
 
-    // async AI generation (non-blocking)
+    // 3) Nudge logic: encourage 5 readings/week (non-fatal)
+    try {
+      const sinceWeek = new Date();
+      sinceWeek.setDate(sinceWeek.getDate() - 7);
+      const count = await BPReading.countDocuments({
+        patient: req.user.id,
+        measuredAt: { $gte: sinceWeek }
+      });
+      const io = getIO();
+      if (count < 5) {
+        io.to(`user:${req.user.id}`).emit('nudge:keep-going', {
+          target: 5,
+          current: count,
+          message: `Great! ${count}/5 readings this week. Add ${5 - count} more for a better assessment.`
+        });
+      }
+    } catch (e) {
+      console.error('nudge emit failed', e?.message || e);
+    }
+
+    // 4) Async AI generation & persistence (non-blocking)
     (async () => {
       try {
-        const since = new Date(); since.setDate(since.getDate()-7);
-        const recent = await BPReading.find({ patient: req.user.id, measuredAt: { $gte: since } }).sort({ measuredAt: 1 });
+        // fetch readings for the last 7 days (or adjust window)
+        const since = new Date();
+        since.setDate(since.getDate() - 7);
+        const recent = await BPReading.find({
+          patient: req.user.id,
+          measuredAt: { $gte: since }
+        }).sort({ measuredAt: 1 });
 
+        // last three (newest -> oldest in array)
         const lastThree = [...recent].slice(-3).reverse().map(r => ({
-          systolic: r.systolic, diastolic: r.diastolic, pulse: r.pulse ?? null, measuredAt: r.measuredAt
+          systolic: r.systolic,
+          diastolic: r.diastolic,
+          pulse: r.pulse ?? null,
+          measuredAt: r.measuredAt
         }));
 
+        // patient context for the AI prompt
         const p = await User.findById(req.user.id).lean();
         const patientInfo = p ? {
-          name: p.name, age: p.age ?? null, gender: p.gender ?? null, weight: p.weight ?? null, pmh: p.pmh ?? [], allergies: p.allergies ?? []
+          name: p.name,
+          age: p.age ?? null,
+          gender: p.gender ?? null,
+          weight: p.weight ?? null,
+          pmh: p.pmh ?? [],
+          allergies: p.allergies ?? []
         } : {};
 
+        // call Gemini / rules wrapper
         const aiRes = await generateAIReportFromReadings({
-          readings: recent, extraNotes: notes, patientInfo, lastThree
+          readings: recent,
+          extraNotes: notes,
+          patientInfo,
+          lastThree,
+          conversationId
         });
 
+        // persist AIReport including conversationId
         const aiReport = await AIReport.create({
           patient: req.user.id,
           generatedBy: aiRes.generatedBy || 'gemini',
           inputContext: aiRes.inputContext || {},
           content: aiRes.content || {},
-          status: 'pending'
+          status: 'pending',
+          conversationId: conversationId || null
         });
 
+        // emit enriched payload to doctors (left pane + right pane info)
         try {
           const io = getIO();
           io.to('doctors').emit('ai_report:generated', {
@@ -375,15 +414,24 @@ exports.addReading = async (req, res, next) => {
             patientId: req.user.id,
             content: aiReport.content,
             patientDetails: patientInfo,
+            conversationId: aiReport.conversationId,
             createdAt: aiReport.createdAt
           });
-        } catch (_) {}
-      } catch (err) { console.error('Async AI generation error:', err?.message || err); }
+        } catch (emitErr) {
+          console.error('emit ai_report:generated failed', emitErr);
+        }
+      } catch (aiErr) {
+        console.error('Async AI generation error:', aiErr?.message || aiErr);
+      }
     })();
 
-    res.status(201).json({ reading, aiStatus: 'processing' });
-  } catch (e) { next(e); }
+    // 5) Fast response to client
+    res.status(201).json({ reading, aiStatus: 'processing', conversationId: conversationId || null });
+  } catch (e) {
+    next(e);
+  }
 };
+
 
 // GET /api/patient/readings
 exports.getReadings = async (req, res, next) => {
